@@ -31,7 +31,7 @@ const paymentSchema = mongoose.Schema(
       enum: ['Pending', 'Completed', 'Failed', 'Refunded'],
       default: 'Completed',
     },
-    recordedBy: {
+    createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,

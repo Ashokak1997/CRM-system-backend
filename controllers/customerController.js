@@ -2,7 +2,7 @@ const Customer = require('../models/Customer');
 const Lead = require('../models/Lead');
 const getCustomers = async (req, res) => {
   try {
-    const customers = await Customer.find().populate('leadId', 'projectType assignedTo status');
+    const customers = await Customer.find({ createdBy: req.user.id }).populate('leadId', 'projectType assignedTo status');
     res.status(200).json(customers);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -14,11 +14,15 @@ const getCustomerById = async (req, res) => {
     const customer = await Customer.findById(req.params.id)
       .populate('leadId', 'projectType assignedTo notes createdAt');
 
-    if (customer) {
-      res.status(200).json(customer);
-    } else {
-      res.status(404).json({ message: 'Customer not found' });
+    if (!customer) {
+      return res.status(404).json({ message: 'Customer not found' });
     }
+
+    if (customer.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'User not authorized' });
+    }
+
+    res.status(200).json(customer);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -34,6 +38,10 @@ const convertLeadToCustomer = async (req, res) => {
       return res.status(404).json({ message: 'Lead not found' });
     }
 
+    if (lead.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'User not authorized to convert this lead' });
+    }
+
     const customerExists = await Customer.findOne({ leadId });
     if (customerExists) {
       return res.status(400).json({ message: 'Lead has already been converted to a customer' });
@@ -43,7 +51,8 @@ const convertLeadToCustomer = async (req, res) => {
       phone: lead.phone,
       email: lead.email,
       address: lead.address,
-      leadId: lead._id
+      leadId: lead._id,
+      createdBy: req.user.id
     });
 
     const createdCustomer = await customer.save();

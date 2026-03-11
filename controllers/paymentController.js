@@ -6,10 +6,10 @@ const Project = require('../models/Project');
 // @access  Private
 const getPayments = async (req, res) => {
   try {
-    const payments = await Payment.find()
+    const payments = await Payment.find({ createdBy: req.user.id })
       .populate('projectId', 'projectName status')
       .populate('customerId', 'name email address')
-      .populate('recordedBy', 'name');
+      .populate('createdBy', 'name');
     res.status(200).json(payments);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -24,13 +24,17 @@ const getPaymentById = async (req, res) => {
     const payment = await Payment.findById(req.params.id)
       .populate('projectId', 'projectName status')
       .populate('customerId', 'name email')
-      .populate('recordedBy', 'name');
+      .populate('createdBy', 'name');
 
-    if (payment) {
-      res.status(200).json(payment);
-    } else {
-      res.status(404).json({ message: 'Payment not found' });
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
     }
+
+    if (payment.createdBy._id.toString() !== req.user.id && payment.createdBy.toString() !== req.user.id) {
+       return res.status(401).json({ message: 'User not authorized' });
+    }
+
+    res.status(200).json(payment);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -59,7 +63,7 @@ const recordPayment = async (req, res) => {
       amount,
       paymentMethod,
       status: status || 'Completed',
-      recordedBy: req.user._id, // from authMiddleware
+      createdBy: req.user.id,
       notes
     });
 
@@ -73,13 +77,17 @@ const recordPayment = async (req, res) => {
 const updatePaymentStatus = async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id);
-    if (payment) {
-      payment.status = req.body.status || payment.status;
-      const updatedPayment = await payment.save();
-      res.status(200).json(updatedPayment);
-    } else {
-      res.status(404).json({ message: 'Payment not found' });
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
     }
+
+    if (payment.createdBy.toString() !== req.user.id) {
+       return res.status(401).json({ message: 'User not authorized' });
+    }
+
+    payment.status = req.body.status || payment.status;
+    const updatedPayment = await payment.save();
+    res.status(200).json(updatedPayment);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -88,12 +96,16 @@ const updatePaymentStatus = async (req, res) => {
 const deletePayment = async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id);
-    if (payment) {
-      await payment.deleteOne();
-      res.status(200).json({ message: 'Payment record removed' });
-    } else {
-      res.status(404).json({ message: 'Payment not found' });
+    if (!payment) {
+       return res.status(404).json({ message: 'Payment not found' });
     }
+
+    if (payment.createdBy.toString() !== req.user.id) {
+       return res.status(401).json({ message: 'User not authorized' });
+    }
+
+    await payment.deleteOne();
+    res.status(200).json({ message: 'Payment record removed' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -24,6 +24,11 @@ const customerSchema = mongoose.Schema(
       ref: 'Lead',
       unique: true,
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: 'User',
+    },
   },
   {
     timestamps: true,

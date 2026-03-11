@@ -2,10 +2,10 @@ const Quote = require('../models/Quote');
 
 const getQuotes = async (req, res) => {
   try {
-    const quotes = await Quote.find()
+    const quotes = await Quote.find({ createdBy: req.user.id })
       .populate('customerId', 'name email phone')
       .populate('leadId', 'customerName email phone')
-      .populate('creatorId', 'name');
+      .populate('createdBy', 'name');
     res.status(200).json(quotes);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -17,13 +17,17 @@ const getQuoteById = async (req, res) => {
     const quote = await Quote.findById(req.params.id)
       .populate('customerId', 'name email address')
       .populate('leadId', 'customerName email address')
-      .populate('creatorId', 'name email');
+      .populate('createdBy', 'name email');
 
-    if (quote) {
-      res.status(200).json(quote);
-    } else {
-      res.status(404).json({ message: 'Quote not found' });
+    if (!quote) {
+      return res.status(404).json({ message: 'Quote not found' });
     }
+
+    if (quote.createdBy._id.toString() !== req.user.id && quote.createdBy.toString() !== req.user.id) {
+       return res.status(401).json({ message: 'User not authorized' });
+    }
+    
+    res.status(200).json(quote);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -62,7 +66,7 @@ const createQuote = async (req, res) => {
       quoteNumber,
       customerId: customerId || null,
       leadId: leadId || null,
-      creatorId: req.user._id, // from authMiddleware
+      createdBy: req.user.id,
       items: calculatedItems,
       subTotal,
       tax,
@@ -82,13 +86,17 @@ const createQuote = async (req, res) => {
 const updateQuoteStatus = async (req, res) => {
   try {
     const quote = await Quote.findById(req.params.id);
-    if (quote) {
-      quote.status = req.body.status || quote.status;
-      const updatedQuote = await quote.save();
-      res.status(200).json(updatedQuote);
-    } else {
-      res.status(404).json({ message: 'Quote not found' });
+    if (!quote) {
+      return res.status(404).json({ message: 'Quote not found' });
     }
+
+    if (quote.createdBy.toString() !== req.user.id) {
+       return res.status(401).json({ message: 'User not authorized' });
+    }
+
+    quote.status = req.body.status || quote.status;
+    const updatedQuote = await quote.save();
+    res.status(200).json(updatedQuote);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -97,12 +105,16 @@ const updateQuoteStatus = async (req, res) => {
 const deleteQuote = async (req, res) => {
   try {
     const quote = await Quote.findById(req.params.id);
-    if (quote) {
-      await quote.deleteOne();
-      res.status(200).json({ message: 'Quote removed' });
-    } else {
-      res.status(404).json({ message: 'Quote not found' });
+    if (!quote) {
+      return res.status(404).json({ message: 'Quote not found' });
     }
+
+    if (quote.createdBy.toString() !== req.user.id) {
+       return res.status(401).json({ message: 'User not authorized' });
+    }
+
+    await quote.deleteOne();
+    res.status(200).json({ message: 'Quote removed' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

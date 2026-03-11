@@ -6,7 +6,7 @@ const Project = require('../models/Project');
 const getProjects = async (req, res) => {
   try {
     // Optional query to filter by manager or status
-    const filter = {};
+    const filter = { createdBy: req.user.id };
     if (req.query.status) {
       filter.status = req.query.status;
     }
@@ -45,6 +45,7 @@ const createProject = async (req, res) => {
       status,
       startDate,
       endDate,
+      createdBy: req.user.id,
     });
 
     const createdProject = await project.save();
@@ -61,13 +62,17 @@ const updateProject = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
 
-    if (project) {
-      Object.assign(project, req.body);
-      const updatedProject = await project.save();
-      res.status(200).json(updatedProject);
-    } else {
-      res.status(404).json({ message: 'Project not found' });
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
     }
+
+    if (project.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'User not authorized' });
+    }
+
+    Object.assign(project, req.body);
+    const updatedProject = await project.save();
+    res.status(200).json(updatedProject);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -80,12 +85,16 @@ const deleteProject = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
 
-    if (project) {
-      await project.deleteOne();
-      res.status(200).json({ message: 'Project removed' });
-    } else {
-      res.status(404).json({ message: 'Project not found' });
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
     }
+
+    if (project.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'User not authorized' });
+    }
+
+    await project.deleteOne();
+    res.status(200).json({ message: 'Project removed' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

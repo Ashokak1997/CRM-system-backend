@@ -5,7 +5,7 @@ const Lead = require('../models/Lead');
 // @access  Private
 const getLeads = async (req, res) => {
   try {
-    const leads = await Lead.find().populate('assignedTo', 'name email');
+    const leads = await Lead.find({ createdBy: req.user.id }).populate('assignedTo', 'name email');
     res.status(200).json(leads);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -18,11 +18,14 @@ const getLeads = async (req, res) => {
 const getLeadById = async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id).populate('assignedTo', 'name email');
-    if (lead) {
-      res.status(200).json(lead);
-    } else {
-      res.status(404).json({ message: 'Lead not found' });
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
     }
+    if (lead.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'User not authorized' });
+    }
+    
+    res.status(200).json(lead);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -53,6 +56,7 @@ const createLead = async (req, res) => {
       assignedTo,
       status,
       notes,
+      createdBy: req.user.id,
     });
 
     const createdLead = await lead.save();
@@ -69,13 +73,17 @@ const updateLead = async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id);
 
-    if (lead) {
-      Object.assign(lead, req.body);
-      const updatedLead = await lead.save();
-      res.status(200).json(updatedLead);
-    } else {
-      res.status(404).json({ message: 'Lead not found' });
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
     }
+
+    if (lead.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'User not authorized' });
+    }
+
+    Object.assign(lead, req.body);
+    const updatedLead = await lead.save();
+    res.status(200).json(updatedLead);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -89,13 +97,17 @@ const updateLeadStatus = async (req, res) => {
     const { status } = req.body;
     const lead = await Lead.findById(req.params.id);
 
-    if (lead) {
-      lead.status = status || lead.status;
-      const updatedLead = await lead.save();
-      res.status(200).json(updatedLead);
-    } else {
-      res.status(404).json({ message: 'Lead not found' });
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
     }
+
+    if (lead.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'User not authorized' });
+    }
+
+    lead.status = status || lead.status;
+    const updatedLead = await lead.save();
+    res.status(200).json(updatedLead);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -108,12 +120,16 @@ const deleteLead = async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id);
 
-    if (lead) {
-      await lead.deleteOne();
-      res.status(200).json({ message: 'Lead removed' });
-    } else {
-      res.status(404).json({ message: 'Lead not found' });
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
     }
+
+    if (lead.createdBy.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'User not authorized' });
+    }
+
+    await lead.deleteOne();
+    res.status(200).json({ message: 'Lead removed' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

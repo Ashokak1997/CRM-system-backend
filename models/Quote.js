@@ -24,7 +24,7 @@ const quoteSchema = mongoose.Schema(
       ref: 'Lead',
       required: false,
     },
-    creatorId: {
+    createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,

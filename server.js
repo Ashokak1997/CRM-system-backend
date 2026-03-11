@@ -14,8 +14,9 @@ const app = express();
 // Body Parser Middleware
 app.use(express.json());
 
-// Enable CORS
-app.use(cors());
+app.use(cors({
+    origin: "*"
+}));
 
 // Routes
 // Note: These route files need to be created
